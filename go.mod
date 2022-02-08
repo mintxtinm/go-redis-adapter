@@ -1,4 +1,4 @@
-module github.com/mintxtinm/go-redis-adapter
+module github.com/mintxtinm/go-redis-adapter/v2
 
 go 1.17
 
