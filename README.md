@@ -1,10 +1,10 @@
-# Redis Adapter [![Build Status](https://travis-ci.org/casbin/redis-adapter.svg?branch=master)](https://travis-ci.org/casbin/redis-adapter) [![Coverage Status](https://coveralls.io/repos/github/casbin/redis-adapter/badge.svg?branch=master)](https://coveralls.io/github/casbin/redis-adapter?branch=master) [![Godoc](https://godoc.org/github.com/casbin/redis-adapter?status.svg)](https://godoc.org/github.com/casbin/redis-adapter)
+# Redis Adapter [![Godoc](https://pkg.go.dev/badge/github.com/mintxtinm/go-redis-adapter/v2)](https://pkg.go.dev/github.com/mintxtinm/go-redis-adapter/v2@v2.2.1)
 
-Redis Adapter is the [Redis](https://redis.io/) adapter for [Casbin](https://github.com/casbin/casbin), but with go-redis as its client library. With this library, Casbin can load policy from Redis or save policy to it.
+Redis Adapter for go-redis is the [Redis](https://redis.io/) adapter for [Casbin](https://github.com/casbin/casbin), but with [go-redis] (https://github.com/go-redis/redis) as its client library. With this library, Casbin can load policy from Redis or save policy to it.
 
 ## Installation
 
-    go get github.com/casbin/redis-adapter/v2
+    go get github.com/mintxtinm/go-redis-adapter/v2
 
 ## Simple Example
 
@@ -13,7 +13,7 @@ package main
 
 import (
 	"github.com/casbin/casbin/v2"
-	"github.com/casbin/redis-adapter/v2"
+	"github.com/mintxtinm/go-redis-adapter/v2"
 )
 
 func main() {
