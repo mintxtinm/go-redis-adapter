@@ -15,6 +15,7 @@
 package redisadapter
 
 import (
+	"context"
 	"log"
 	"testing"
 
@@ -33,11 +34,14 @@ func testGetPolicy(t *testing.T, e *casbin.Enforcer, res [][]string) {
 }
 
 func TestAdapter(t *testing.T) {
+
 	// Because the DB is empty at first,
 	// so we need to load the policy from the file adapter (.CSV) first.
 	e, _ := casbin.NewEnforcer("examples/rbac_model.conf", "examples/rbac_policy.csv")
 
 	a := NewAdapter("tcp", "127.0.0.1:6379")
+	a.conn.FlushAll(context.TODO())
+
 	// Use the following if Redis has password like "123"
 	//a := NewAdapterWithPassword("tcp", "127.0.0.1:6379", "123")
 	t.Run("Read the policies from an empty redis", func(t *testing.T) {

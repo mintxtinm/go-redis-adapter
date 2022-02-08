@@ -15,13 +15,15 @@
 package redisadapter
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
+	"reflect"
 	"runtime"
 
 	"github.com/casbin/casbin/v2/model"
 	"github.com/casbin/casbin/v2/persist"
-	"github.com/gomodule/redigo/redis"
+	"github.com/go-redis/redis/v8"
 )
 
 // CasbinRule is used to determine which policy line to load.
@@ -120,21 +122,30 @@ func WithKey(key string) Option {
 }
 
 func (a *Adapter) open() {
-	//redis.Dial("tcp", "127.0.0.1:6379")
+	ctx := context.TODO()
+
 	if a.password == "" {
-		conn, err := redis.Dial(a.network, a.address)
-		if err != nil {
+		conn := redis.NewClient(&redis.Options{
+			Network: a.network,
+			Addr:    a.address,
+		})
+		if _, err := conn.Ping(context.Background()).Result(); err != nil {
 			panic(err)
 		}
 
-		a.conn = conn
+		a.conn = *conn.Conn(ctx)
+
 	} else {
-		conn, err := redis.Dial(a.network, a.address, redis.DialPassword(a.password))
-		if err != nil {
+		conn := redis.NewClient(&redis.Options{
+			Network:  a.network,
+			Addr:     a.address,
+			Password: a.password,
+		})
+		if _, err := conn.Ping(context.Background()).Result(); err != nil {
 			panic(err)
 		}
 
-		a.conn = conn
+		a.conn = *conn.Conn(ctx)
 	}
 }
 
@@ -174,24 +185,24 @@ func loadPolicyLine(line CasbinRule, model model.Model) {
 
 // LoadPolicy loads policy from database.
 func (a *Adapter) LoadPolicy(model model.Model) error {
-	num, err := redis.Int(a.conn.Do("LLEN", a.key))
-	if err == redis.ErrNil {
+	ctx := context.TODO()
+
+	num, err := a.conn.LLen(ctx, a.key).Uint64()
+	if err == redis.Nil {
 		return nil
 	}
 	if err != nil {
 		return err
 	}
-	values, err := redis.Values(a.conn.Do("LRANGE", a.key, 0, num))
+
+	values, err := a.conn.LRange(ctx, a.key, 0, int64(num)).Result()
 	if err != nil {
 		return err
 	}
 
 	var line CasbinRule
 	for _, value := range values {
-		text, ok := value.([]byte)
-		if !ok {
-			return errors.New("the type is wrong")
-		}
+		text := []byte(value)
 		err = json.Unmarshal(text, &line)
 		if err != nil {
 			return err
@@ -230,6 +241,7 @@ func savePolicyLine(ptype string, rule []string) CasbinRule {
 
 // SavePolicy saves policy to database.
 func (a *Adapter) SavePolicy(model model.Model) error {
+	ctx := context.TODO()
 	a.dropTable()
 	a.createTable()
 
@@ -257,29 +269,31 @@ func (a *Adapter) SavePolicy(model model.Model) error {
 		}
 	}
 
-	_, err := a.conn.Do("RPUSH", redis.Args{}.Add(a.key).AddFlat(texts)...)
+	err := a.conn.RPush(ctx, a.key, flatten(texts)...).Err()
 	return err
 }
 
 // AddPolicy adds a policy rule to the storage.
 func (a *Adapter) AddPolicy(sec string, ptype string, rule []string) error {
+	ctx := context.TODO()
 	line := savePolicyLine(ptype, rule)
 	text, err := json.Marshal(line)
 	if err != nil {
 		return err
 	}
-	_, err = a.conn.Do("RPUSH", a.key, text)
+	err = a.conn.RPush(ctx, a.key, text).Err()
 	return err
 }
 
 // RemovePolicy removes a policy rule from the storage.
 func (a *Adapter) RemovePolicy(sec string, ptype string, rule []string) error {
+	ctx := context.TODO()
 	line := savePolicyLine(ptype, rule)
 	text, err := json.Marshal(line)
 	if err != nil {
 		return err
 	}
-	_, err = a.conn.Do("LREM", a.key, 1, text)
+	err = a.conn.LRem(ctx, a.key, 1, text).Err()
 	return err
 }
 
@@ -290,6 +304,7 @@ func (a *Adapter) RemoveFilteredPolicy(sec string, ptype string, fieldIndex int,
 
 // AddPolicies adds policy rules to the storage.
 func (a *Adapter) AddPolicies(sec string, ptype string, rules [][]string) error {
+	ctx := context.TODO()
 	var texts [][]byte
 	for _, rule := range rules {
 		line := savePolicyLine(ptype, rule)
@@ -299,22 +314,38 @@ func (a *Adapter) AddPolicies(sec string, ptype string, rules [][]string) error 
 		}
 		texts = append(texts, text)
 	}
-	_, err := a.conn.Do("RPUSH", redis.Args{}.Add(a.key).AddFlat(texts)...)
+	err := a.conn.RPush(ctx, a.key, flatten(texts)...).Err()
 	return err
 }
 
 // RemovePolicies removes policy rules from the storage.
 func (a *Adapter) RemovePolicies(sec string, ptype string, rules [][]string) error {
+	ctx := context.TODO()
+
 	for _, rule := range rules {
 		line := savePolicyLine(ptype, rule)
 		text, err := json.Marshal(line)
 		if err != nil {
 			return err
 		}
-		_, err = a.conn.Do("LREM", a.key, 1, text)
+		err = a.conn.LRem(ctx, a.key, 1, text).Err()
 		if err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+func flatten(v interface{}) []interface{} {
+	slice := []interface{}{}
+
+	rv := reflect.ValueOf(v)
+	switch rv.Kind() {
+	case reflect.Slice:
+		for i := 0; i < rv.Len(); i++ {
+			slice = append(slice, rv.Index(i).Interface())
+		}
+	}
+
+	return slice
 }
