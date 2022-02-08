@@ -1,4 +1,4 @@
-module github.com/mintxtinm/casbin-adapter-redis
+module github.com/mintxtinm/go-redis-adapter
 
 go 1.17
 
